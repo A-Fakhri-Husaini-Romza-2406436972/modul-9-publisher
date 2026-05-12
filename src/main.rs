@@ -1,30 +1,67 @@
 use borsh::{BorshDeserialize, BorshSerialize};
-use crosstown_bus::{CrosstownBus, MessageHandler, HandleError};
+use lapin::{
+    options::*,
+    BasicProperties,
+    Connection,
+    ConnectionProperties,
+};
+use lapin::types::FieldTable;
+
 #[derive(Debug, Clone, BorshDeserialize, BorshSerialize)]
 pub struct UserCreatedEventMessage {
-pub user_id: String,
-pub user_name: String
+    pub user_id: String,
+    pub user_name: String,
 }
-pub struct UserCreatedHandler;
-impl MessageHandler<UserCreatedEventMessage> for UserCreatedHandler {
-fn handle(&self, message: Box<UserCreatedEventMessage>) -> Result<(),
-HandleError> {
-println!("Message received on handler 1: {:?}", message);
-Ok(())
-}
-}
-fn main() {
-let mut p =
-CrosstownBus::new_queue_publisher("amqp://guest:guest@localhost:5672".to_owned(
-)).unwrap();
-_ = p.publish_event("user_created".to_owned(), UserCreatedEventMessage {
-user_id: "1".to_owned(), user_name: "2406436972-Amir".to_owned() });
-_ = p.publish_event("user_created".to_owned(), UserCreatedEventMessage {
-user_id: "2".to_owned(), user_name: "2406436972-Budi".to_owned() });
-_ = p.publish_event("user_created".to_owned(), UserCreatedEventMessage {
-user_id: "3".to_owned(), user_name: "2406436972-Cica".to_owned() });
-_ = p.publish_event("user_created".to_owned(), UserCreatedEventMessage {
-user_id: "4".to_owned(), user_name: "2406436972-Dira".to_owned() });
-_ = p.publish_event("user_created".to_owned(), UserCreatedEventMessage {
-user_id: "5".to_owned(), user_name: "2406436972-Emir".to_owned() });
+
+#[tokio::main]
+async fn main() {
+    let conn = Connection::connect(
+        "amqp://guest:guest@127.0.0.1:5672/%2f",
+        ConnectionProperties::default(),
+    )
+    .await
+    .expect("Failed to connect");
+
+    let channel = conn.create_channel().await.expect("Create channel failed");
+
+    channel
+        .queue_declare(
+            "user_created",
+            QueueDeclareOptions::default(),
+            FieldTable::default(),
+        )
+        .await
+        .expect("Queue declare failed");
+
+    let users = vec![
+        ("1", "2406436972-Amir"),
+        ("2", "2406436972-Budi"),
+        ("3", "2406436972-Cica"),
+        ("4", "2406436972-Dira"),
+        ("5", "2406436972-Emir"),
+    ];
+
+    for (id, name) in users {
+        let message = UserCreatedEventMessage {
+            user_id: id.to_string(),
+            user_name: name.to_string(),
+        };
+
+        let payload = message.try_to_vec().expect("Serialize failed");
+
+        channel
+            .basic_publish(
+                "",
+                "user_created",
+                BasicPublishOptions::default(),
+                &payload,
+                BasicProperties::default(),
+            )
+            .await
+            .expect("Publish failed")
+            .await
+            .expect("Confirm failed");
+
+        println!("Message sent: {:?}", message);
+    }
 }

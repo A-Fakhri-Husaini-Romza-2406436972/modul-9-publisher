@@ -8,3 +8,5 @@ Program publisher mengirim 5 pesan event `user_created` dalam satu kali run. Set
 - `guest` pertama adalah username.
 - `guest` kedua adalah password.
 - `localhost:5672` adalah alamat host dan port broker AMQP (biasanya RabbitMQ), dengan `5672` sebagai port default.
+
+![alt text](image.png)
